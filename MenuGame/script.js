@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Música del menú
+    const menuMusic = new Audio('Menu_music.mp3');
+    menuMusic.loop = true;
+    menuMusic.volume = 0.5;
+
+    function startMenuMusic() {
+        menuMusic.play().catch(() => {});
+    }
+    startMenuMusic();
+    // Si el navegador bloqueó el autoplay, arranca en la primera interacción del jugador
+    document.addEventListener('pointerdown', startMenuMusic, { once: true });
+    document.addEventListener('keydown', startMenuMusic, { once: true });
+    document.addEventListener('mousemove', startMenuMusic, { once: true });
+
     const options = document.querySelectorAll('.option');
     let currentIndex = 0;
 

@@ -16,10 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const winScreen = document.getElementById('win-screen');
     const winText = document.getElementById('win-text');
     const loseScreen = document.getElementById('lose-screen');
+    const menuBtn = document.getElementById('menu-btn');
+    const screamer = document.getElementById('screamer');
+    const screamerFrame = document.getElementById('screamer-frame');
 
     // Referencias de defensas
     const handArmario = document.getElementById('hand-armario');
     const ps5Hotspot = document.getElementById('ps5-hotspot');
+
+    menuBtn.addEventListener('click', () => {
+        window.location.href = '../MenuGame/index.html';
+    });
 
     // Intro sequence
     setTimeout(() => {
@@ -83,9 +90,45 @@ document.addEventListener('DOMContentLoaded', () => {
     let patrolTimer = null;
     let attackTimer = null;
     let banioSoundPlayed = false;
+    let horrorHitPlayed = false;
     const banioSound = new Audio('SOUND/baño.mp3');
     const cambiarCamaraSound = new Audio('SOUND/cambiar_camara.mp3');
     const abrirCamaraSound = new Audio('SOUND/abrir_camara.mp3');
+    const cerrarVentanaSound = new Audio('SOUND/cerrar_ventana.mp3');
+    const horrorHitSound = new Audio('SOUND/horror_hit.mp3');
+    const screamerSound = new Audio('SOUND/screamer.mp3');
+
+    // --- SCREAMER ---
+    const SCREAMER_FRAME_COUNT = 7;   // fotogramas Screamer/1.png .. N.png
+    const SCREAMER_FRAME_MS = 83.75;  // duración de cada fotograma
+    const SCREAMER_ZOOM_MS = 100;     // zoom del último fotograma para concluir
+
+    // Escena de oficina donde queda "cara a cara" con cada ataque directo
+    const ATTACK_SCENE = {
+        ATTACK_VENTANA: 'LEFT',
+        ATTACK_ARMARIO: 'RIGHT',
+        ATTACK_PUERTA: 'CENTER',
+    };
+
+    function checkFaceToFace() {
+        if (isMonitorUp || horrorHitPlayed) return;
+        if (ATTACK_SCENE[monsterState] === currentScene) {
+            horrorHitPlayed = true;
+            horrorHitSound.currentTime = 0;
+            horrorHitSound.play().catch(() => {});
+        }
+    }
+
+    // Cortina negra breve para cuando se espanta al monge (ventana/armario/puerta resueltos)
+    function playScareCurtain(afterBlackout) {
+        fadeOverlay.classList.add('active');
+        setTimeout(() => {
+            afterBlackout();
+            setTimeout(() => {
+                fadeOverlay.classList.remove('active');
+            }, 700);
+        }, 300);
+    }
 
     function playBanioSound() {
         if (banioSoundPlayed) return;
@@ -119,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startAttack(type) {
         monsterState = type;
+        horrorHitPlayed = false;
         refreshOfficeScene();
         refreshCurrentCamera();
         updateHotspots();
@@ -130,19 +174,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resolveAttack() {
         clearTimeout(attackTimer);
-        monsterNode = 'comedor';
-        monsterState = 'patrol';
-        banioSoundPlayed = false;
-        refreshOfficeScene();
-        refreshCurrentCamera();
-        updateHotspots();
-        scheduleNextPatrolStep();
+        playScareCurtain(() => {
+            monsterNode = 'comedor';
+            monsterState = 'patrol';
+            banioSoundPlayed = false;
+            horrorHitPlayed = false;
+            refreshOfficeScene();
+            refreshCurrentCamera();
+            updateHotspots();
+            scheduleNextPatrolStep();
+        });
     }
 
     function closeWindow() {
         if (monsterState !== 'ATTACK_VENTANA' || currentScene !== 'LEFT') return;
         clearTimeout(attackTimer);
         ventanaClosing = true;
+        cerrarVentanaSound.currentTime = 0;
+        cerrarVentanaSound.play().catch(() => {});
         bgImage.style.backgroundImage = `url('ventana_monge_closed.png')`;
         setTimeout(() => {
             ventanaClosing = false;
@@ -206,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isMonitorUp || isTransitioning) return;
         bgImage.style.backgroundImage = `url('${getSceneImage(currentScene)}')`;
         updateHotspots();
+        checkFaceToFace();
     }
 
     // Sistema de Tiempo
@@ -246,10 +296,49 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(patrolTimer);
         clearTimeout(attackTimer);
         atmosphereSound.pause();
+
+        // Dirigir la vista hacia la zona de donde proviene el screamer
+        const scene = ATTACK_SCENE[monsterState] || 'CENTER';
         if (isMonitorUp) {
             cameraSystem.classList.remove('active');
             isMonitorUp = false;
         }
+        // La habitación vuelve a su estado alone (el monge ya no está en la escena de fondo)
+        monsterState = 'patrol';
+        ventanaClosing = false;
+        isTransitioning = false;
+        currentScene = scene;
+        bgImage.style.backgroundImage = `url('${getSceneImage(scene)}')`;
+        handArmario.classList.add('hidden');
+        ps5Hotspot.classList.add('hidden');
+
+        playScreamer();
+    }
+
+    function playScreamer() {
+        screamerSound.currentTime = 0;
+        screamerSound.play().catch(() => {});
+        screamer.classList.add('active');
+
+        let frame = 1;
+        function step() {
+            screamerFrame.src = `Screamer/${frame}.png`;
+
+            if (frame >= SCREAMER_FRAME_COUNT) {
+                // Último fotograma: zoom para concluir y luego pantalla de derrota
+                requestAnimationFrame(() => screamerFrame.classList.add('zoom'));
+                setTimeout(showLoseScreen, SCREAMER_ZOOM_MS);
+                return;
+            }
+            frame++;
+            setTimeout(step, SCREAMER_FRAME_MS);
+        }
+        step();
+    }
+
+    function showLoseScreen() {
+        screamer.classList.remove('active');
+        screamerFrame.classList.remove('zoom');
         loseScreen.classList.add('active');
     }
 
@@ -365,6 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             currentScene = targetScene;
             bgImage.style.backgroundImage = `url('${getSceneImage(targetScene)}')`;
+            checkFaceToFace();
 
             targetX = window.innerWidth / 2;
             targetY = window.innerHeight / 2;

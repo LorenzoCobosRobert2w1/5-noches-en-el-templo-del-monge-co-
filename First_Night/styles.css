@@ -253,7 +253,36 @@ body.can-click { cursor: pointer; }
 .win-screen.active { opacity: 1; pointer-events: auto; }
 
 /* =========================================
-   PANTALLA DE DERROTA (placeholder de screamer)
+   SCREAMER (secuencia de fotogramas del monge)
+========================================= */
+.screamer {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 190;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    /* Sin fondo propio: se ve la habitación en estado alone por detrás */
+    background: transparent;
+}
+.screamer.active { display: flex; }
+
+.screamer-frame {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transform: scale(1);
+    will-change: transform;
+}
+/* Zoom final para concluir el screamer */
+.screamer-frame.zoom {
+    transition: transform 0.10s linear;
+    transform: scale(1.6);
+}
+
+/* =========================================
+   PANTALLA DE DERROTA
 ========================================= */
 .lose-screen {
     position: fixed;
@@ -262,13 +291,31 @@ body.can-click { cursor: pointer; }
     color: #fff;
     z-index: 200;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    font-size: 5rem;
+    gap: 40px;
     opacity: 0;
     pointer-events: none;
 }
+.lose-screen h1 { font-size: 5rem; }
 .lose-screen.active { opacity: 1; pointer-events: auto; }
+
+.menu-btn {
+    font-family: inherit;
+    font-size: 1rem;
+    color: #fff;
+    background: #000;
+    border: 3px solid #fff;
+    padding: 18px 32px;
+    cursor: pointer;
+    text-shadow: 2px 2px 0 #000;
+    transition: background 0.2s, color 0.2s;
+}
+.menu-btn:hover {
+    background: #fff;
+    color: #a80000;
+}
 
 /* =========================================
    HOTSPOTS DE DEFENSA (armario / ps5)
