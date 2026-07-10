@@ -29,6 +29,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     }, 2000);
 
+    // Sonido ambiente de la noche
+    const atmosphereSound = new Audio('SOUND/atmosfera.mp3');
+    atmosphereSound.loop = true;
+    atmosphereSound.volume = 0.5;
+
+    function startAtmosphere() {
+        atmosphereSound.play().catch(() => {});
+    }
+    startAtmosphere();
+    // Si el navegador bloqueó el autoplay, arranca en la primera interacción del jugador
+    document.addEventListener('pointerdown', startAtmosphere, { once: true });
+    document.addEventListener('mousemove', startAtmosphere, { once: true });
+
     let targetX = window.innerWidth / 2;
     let targetY = window.innerHeight / 2;
     let currentX = targetX;
@@ -71,6 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let attackTimer = null;
     let banioSoundPlayed = false;
     const banioSound = new Audio('SOUND/baño.mp3');
+    const cambiarCamaraSound = new Audio('SOUND/cambiar_camara.mp3');
+    const abrirCamaraSound = new Audio('SOUND/abrir_camara.mp3');
 
     function playBanioSound() {
         if (banioSoundPlayed) return;
@@ -105,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startAttack(type) {
         monsterState = type;
         refreshOfficeScene();
+        refreshCurrentCamera();
         updateHotspots();
         clearTimeout(attackTimer);
         attackTimer = setTimeout(() => {
@@ -154,17 +170,18 @@ document.addEventListener('DOMContentLoaded', () => {
         ps5Hotspot.classList.toggle('hidden', !ps5Active);
     }
 
-    // Imagen de cámara según si el monge está en esa sala o no
+    // Imagen de cámara según si el monge está realmente ahí (si está atacando, ya se fue de la sala)
     function getCamImage(camKey) {
         const files = CAM_FILES[camKey];
-        return monsterNode === camKey ? files.monge : files.alone;
+        const monsterHere = monsterState === 'patrol' && monsterNode === camKey;
+        return monsterHere ? files.monge : files.alone;
     }
 
     function refreshCurrentCamera() {
         if (currentCamKey === 'banio') {
             camBg.classList.add('cam-banio-placeholder');
             camBg.style.backgroundImage = 'none';
-            if (monsterNode === 'banio') playBanioSound();
+            if (monsterState === 'patrol' && monsterNode === 'banio') playBanioSound();
         } else {
             camBg.classList.remove('cam-banio-placeholder');
             camBg.style.backgroundImage = `url('${getCamImage(currentCamKey)}')`;
@@ -211,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(timerInterval);
         clearTimeout(patrolTimer);
         clearTimeout(attackTimer);
+        atmosphereSound.pause();
         if (isMonitorUp) {
             cameraSystem.classList.remove('active');
             isMonitorUp = false;
@@ -227,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(timerInterval);
         clearTimeout(patrolTimer);
         clearTimeout(attackTimer);
+        atmosphereSound.pause();
         if (isMonitorUp) {
             cameraSystem.classList.remove('active');
             isMonitorUp = false;
@@ -243,6 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isMonitorUp) {
             cameraSystem.classList.add('active');
             document.body.classList.remove('can-click');
+            abrirCamaraSound.currentTime = 0;
+            abrirCamaraSound.play().catch(() => {});
         } else {
             cameraSystem.classList.remove('active');
             // Re-evaluar zonas al bajar la cámara
@@ -262,6 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Flash de estática
             camStaticFlash.classList.add('flash');
+            cambiarCamaraSound.currentTime = 0;
+            cambiarCamaraSound.play().catch(() => {});
 
             const camKey = e.target.getAttribute('data-cam');
             currentCamKey = camKey;
@@ -272,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentX = window.innerWidth / 2;
                 camBg.style.transform = `translateX(0px)`;
                 camStaticFlash.classList.remove('flash');
-                if (camKey === 'banio' && monsterNode === 'banio') playBanioSound();
+                if (camKey === 'banio' && monsterState === 'patrol' && monsterNode === 'banio') playBanioSound();
                 updateHotspots();
             }, 150); // Tiempo que dura el pantallazo blanco de estática
         });

@@ -293,6 +293,21 @@ body.can-click { cursor: pointer; }
     height: 12%;
     pointer-events: auto;
     z-index: 55;
+    /* Placeholder visual: todavía no hay arte de la PS5 */
+    border: 3px dashed #0ff;
+    background: rgba(0, 255, 255, 0.12);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #0ff;
+    font-size: 0.75rem;
+    text-align: center;
+    text-shadow: 1px 1px 0 #000;
+}
+
+#ps5-hotspot::after {
+    content: 'PRENDER PS5';
 }
 
 /* Placeholder de la cámara de baño (sin foto todavía) */
