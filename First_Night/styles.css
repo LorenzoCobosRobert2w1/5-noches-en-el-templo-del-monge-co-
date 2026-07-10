@@ -251,3 +251,51 @@ body.can-click { cursor: pointer; }
     transition: opacity 2s ease-in-out;
 }
 .win-screen.active { opacity: 1; pointer-events: auto; }
+
+/* =========================================
+   PANTALLA DE DERROTA (placeholder de screamer)
+========================================= */
+.lose-screen {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: #a80000;
+    color: #fff;
+    z-index: 200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 5rem;
+    opacity: 0;
+    pointer-events: none;
+}
+.lose-screen.active { opacity: 1; pointer-events: auto; }
+
+/* =========================================
+   HOTSPOTS DE DEFENSA (armario / ps5)
+========================================= */
+.hidden { display: none !important; }
+
+.hotspot { cursor: pointer; }
+
+#hand-armario {
+    position: fixed;
+    bottom: 8%;
+    right: 12%;
+    width: 220px;
+    z-index: 15;
+}
+
+#ps5-hotspot {
+    position: absolute;
+    bottom: 15%;
+    left: 40%;
+    width: 12%;
+    height: 12%;
+    pointer-events: auto;
+    z-index: 55;
+}
+
+/* Placeholder de la cámara de baño (sin foto todavía) */
+.cam-bg.cam-banio-placeholder {
+    background-image: repeating-linear-gradient(45deg, #0d0d0d 0px, #0d0d0d 12px, #050505 12px, #050505 24px) !important;
+}
