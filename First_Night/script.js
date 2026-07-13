@@ -31,9 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const jsPsButton = document.getElementById('js-ps-button');
     const jsChargeFill = document.getElementById('js-charge-fill');
 
-    menuBtn.addEventListener('click', () => {
+    const winMenuBtn = document.getElementById('win-menu-btn');
+
+    function goToMenu() {
         window.location.href = '../MenuGame/index.html';
-    });
+    }
+    menuBtn.addEventListener('click', goToMenu);
+    winMenuBtn.addEventListener('click', goToMenu);
 
     // Intro sequence
     setTimeout(() => {
@@ -130,6 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const horrorHitSound = new Audio('SOUND/horror_hit.mp3');
     const screamerSound = new Audio('SOUND/screamer.mp3');
     const ps5TurnOnSound = new Audio('SOUND/ps5_turn_on.mp3');
+    const whoosSound = new Audio('SOUND/whoos.mp3');
+    const festejoSound = new Audio('SOUND/festejo.mp3');
+    festejoSound.volume = 0.7;
+    const alarmSound = new Audio('SOUND/alarm.mp3');
+    alarmSound.volume = 0.35; // más bajo
 
     // --- SCREAMER ---
     const SCREAMER_FRAME_COUNT = 7;   // fotogramas Screamer/1.png .. N.png
@@ -312,9 +321,12 @@ document.addEventListener('DOMContentLoaded', () => {
     joystickBar.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!gameActive || isTransitioning) return;
-        setJoystickUp(!joystickUp);
-        abrirCamaraSound.currentTime = 0;
-        abrirCamaraSound.play().catch(() => {});
+        const raising = !joystickUp;
+        setJoystickUp(raising);
+        if (raising) {
+            whoosSound.currentTime = 0;
+            whoosSound.play().catch(() => {});
+        }
     });
 
     // Mantener apretado sobre el joystick levantado = cargar.
@@ -421,6 +433,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(patrolTimer);
         clearTimeout(attackTimer);
         atmosphereSound.pause();
+        festejoSound.currentTime = 0;
+        festejoSound.play().catch(() => {});
+        alarmSound.currentTime = 0;
+        alarmSound.play().catch(() => {});
         if (isMonitorUp) {
             cameraSystem.classList.remove('active');
             isMonitorUp = false;
