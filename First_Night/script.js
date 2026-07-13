@@ -22,7 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Referencias de defensas
     const handArmario = document.getElementById('hand-armario');
-    const ps5Hotspot = document.getElementById('ps5-hotspot');
+
+    // Referencias del joystick de PS5
+    const joystickBar = document.getElementById('joystick-bar');
+    const joyBarFill = document.getElementById('joystick-bar-fill');
+    const jsBackdrop = document.getElementById('js-backdrop');
+    const jsUnit = document.getElementById('js-unit');
+    const jsPsButton = document.getElementById('js-ps-button');
+    const jsChargeFill = document.getElementById('js-charge-fill');
 
     menuBtn.addEventListener('click', () => {
         window.location.href = '../MenuGame/index.html';
@@ -122,11 +129,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const cerrarVentanaSound = new Audio('SOUND/cerrar_ventana.mp3');
     const horrorHitSound = new Audio('SOUND/horror_hit.mp3');
     const screamerSound = new Audio('SOUND/screamer.mp3');
+    const ps5TurnOnSound = new Audio('SOUND/ps5_turn_on.mp3');
 
     // --- SCREAMER ---
     const SCREAMER_FRAME_COUNT = 7;   // fotogramas Screamer/1.png .. N.png
     const SCREAMER_FRAME_MS = 83.75;  // duración de cada fotograma
     const SCREAMER_ZOOM_MS = 100;     // zoom del último fotograma para concluir
+
+    // --- JOYSTICK DE PS5 (carga estilo caja musical de Puppet) ---
+    // Se descarga siempre: lento en la oficina, rápido con la cámara arriba.
+    // Se recarga manteniendo apretado sobre el joystick levantado.
+    const CHARGE_TICK_MS = 100;
+    const DRAIN_OFFICE_PER_SEC = 1.5; // drenaje sin cámara (lento)
+    const DRAIN_CAM_PER_SEC = 5;      // drenaje con cámara arriba (rápido)
+    const CHARGE_PER_SEC = 12;        // ganancia bruta al mantener apretado
+    const LOW_CHARGE_THRESHOLD = 25;  // debajo de esto la barra se pone roja
+
+    let joystickCharge = 100; // 0..100
+    let joystickUp = false;   // panel en primer plano
+    let charging = false;     // manteniendo apretado
+    let chargeInterval = null;
 
     // Escena de oficina donde queda "cara a cara" con cada ataque directo
     const ATTACK_SCENE = {
@@ -162,6 +184,16 @@ document.addEventListener('DOMContentLoaded', () => {
         banioSound.play().catch(() => {});
     }
 
+    // Probabilidad de ataque de una sala, teniendo en cuenta la carga del joystick:
+    // sin carga (0%), el monge se vuelve muy agresivo con la puerta.
+    function effectiveAttackChance(node) {
+        const base = ROOM_ATTACK_CHANCE[node] || 0;
+        if (joystickCharge <= 0 && ROOM_ATTACK[node] === 'ATTACK_PUERTA') {
+            return node === 'cocina' ? 0.90 : Math.max(base, 0.45);
+        }
+        return base;
+    }
+
     function scheduleNextPatrolStep() {
         clearTimeout(patrolTimer);
         if (!gameActive) return;
@@ -174,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1) Si la sala actual es peligrosa, quizás ataque (nunca el mismo ataque dos veces seguidas).
         const roomAttack = ROOM_ATTACK[monsterNode];
-        const chance = ROOM_ATTACK_CHANCE[monsterNode] || 0;
+        const chance = effectiveAttackChance(monsterNode);
         if (roomAttack && roomAttack !== lastAttack && Math.random() < chance) {
             startAttack(roomAttack);
             return;
@@ -240,18 +272,92 @@ document.addEventListener('DOMContentLoaded', () => {
         resolveAttack();
     });
 
-    ps5Hotspot.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (monsterState !== 'ATTACK_PUERTA' || !isMonitorUp || currentCamKey !== 'living') return;
+    // --- JOYSTICK: levantar / bajar (primer plano estilo cámara) ---
+    function setJoystickUp(up) {
+        if (up && isMonitorUp) {
+            // No se puede tener cámara y joystick a la vez: baja la cámara
+            cameraSystem.classList.remove('active');
+            isMonitorUp = false;
+        }
+        joystickUp = up;
+        if (!up) charging = false;
+        document.body.classList.toggle('joystick-up', up);
+        updateJoystickBar();
+    }
+
+    function updateJoystickBar() {
+        // La barra del joystick solo se ve en la oficina (no con la cámara arriba)
+        joystickBar.classList.toggle('hidden', isMonitorUp || !gameActive);
+    }
+
+    function updateChargeUI() {
+        const pct = Math.round(joystickCharge);
+        const color = pct <= LOW_CHARGE_THRESHOLD ? '#c0392b' : '#2ecc71';
+        jsChargeFill.style.width = pct + '%';
+        jsChargeFill.style.background = color;
+        joyBarFill.style.width = pct + '%';
+        joyBarFill.style.background = color;
+    }
+
+    // Prender la PS5 para espantar al monge de la puerta (requiere carga)
+    function powerOnPS5() {
+        if (joystickCharge <= 0) return;
+        ps5TurnOnSound.currentTime = 0;
+        ps5TurnOnSound.play().catch(() => {});
+        setJoystickUp(false);
         resolveAttack();
+    }
+
+    // Levantar/bajar el joystick haciendo click en su barra lateral (no como la cámara)
+    joystickBar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!gameActive || isTransitioning) return;
+        setJoystickUp(!joystickUp);
+        abrirCamaraSound.currentTime = 0;
+        abrirCamaraSound.play().catch(() => {});
     });
+
+    // Mantener apretado sobre el joystick levantado = cargar.
+    // Durante el ataque de puerta NO se carga: hay que clickear el logo PS puntual.
+    jsBackdrop.addEventListener('mousedown', () => {
+        if (!gameActive || !joystickUp) return;
+        if (monsterState === 'ATTACK_PUERTA') return;
+        charging = true;
+    });
+
+    // Click en el botón PS: prende la PS5 si el monge está en la puerta; si no, carga.
+    jsPsButton.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        if (!gameActive || !joystickUp) return;
+        if (monsterState === 'ATTACK_PUERTA') {
+            powerOnPS5();
+        } else {
+            charging = true;
+        }
+    });
+
+    document.addEventListener('mouseup', () => { charging = false; });
+
+    // Bucle de carga/descarga
+    function chargeTick() {
+        if (!gameActive) return;
+        const dt = CHARGE_TICK_MS / 1000;
+        let delta;
+        if (charging && joystickUp && !isMonitorUp) {
+            delta = (CHARGE_PER_SEC - DRAIN_OFFICE_PER_SEC) * dt;
+        } else {
+            delta = -(isMonitorUp ? DRAIN_CAM_PER_SEC : DRAIN_OFFICE_PER_SEC) * dt;
+        }
+        joystickCharge = Math.max(0, Math.min(100, joystickCharge + delta));
+        updateChargeUI();
+    }
 
     function updateHotspots() {
         const armarioActive = monsterState === 'ATTACK_ARMARIO' && currentScene === 'RIGHT' && !isMonitorUp;
         handArmario.classList.toggle('hidden', !armarioActive);
 
-        const ps5Active = monsterState === 'ATTACK_PUERTA' && isMonitorUp && currentCamKey === 'living';
-        ps5Hotspot.classList.toggle('hidden', !ps5Active);
+        // El logo PS parpadea cuando el monge está en la puerta (hay que clickearlo)
+        jsPsButton.classList.toggle('js-ps-alert', monsterState === 'ATTACK_PUERTA');
     }
 
     // Imagen de cámara según si el monge está realmente ahí (si está atacando, ya se fue de la sala)
@@ -311,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function triggerWin() {
         gameActive = false;
         clearInterval(timerInterval);
+        clearInterval(chargeInterval);
         clearTimeout(patrolTimer);
         clearTimeout(attackTimer);
         atmosphereSound.pause();
@@ -318,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cameraSystem.classList.remove('active');
             isMonitorUp = false;
         }
+        setJoystickUp(false);
         winScreen.classList.add('active');
         setTimeout(() => {
             winText.innerText = "6:00 AM";
@@ -328,9 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!gameActive) return;
         gameActive = false;
         clearInterval(timerInterval);
+        clearInterval(chargeInterval);
         clearTimeout(patrolTimer);
         clearTimeout(attackTimer);
         atmosphereSound.pause();
+        setJoystickUp(false);
 
         // Dirigir la vista hacia la zona de donde proviene el screamer
         const scene = ATTACK_SCENE[monsterState] || 'CENTER';
@@ -345,7 +455,6 @@ document.addEventListener('DOMContentLoaded', () => {
         currentScene = scene;
         bgImage.style.backgroundImage = `url('${getSceneImage(scene)}')`;
         handArmario.classList.add('hidden');
-        ps5Hotspot.classList.add('hidden');
 
         playScreamer();
     }
@@ -381,6 +490,9 @@ document.addEventListener('DOMContentLoaded', () => {
     monitorBar.addEventListener('mouseenter', () => {
         if (!gameActive || isTransitioning) return;
 
+        // No se puede tener joystick y cámara a la vez
+        if (joystickUp) setJoystickUp(false);
+
         isMonitorUp = !isMonitorUp;
 
         if (isMonitorUp) {
@@ -394,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
             checkInteractionZones(targetX);
             refreshOfficeScene();
         }
+        updateJoystickBar();
         updateHotspots();
     });
 
@@ -432,13 +545,17 @@ document.addEventListener('DOMContentLoaded', () => {
         targetX = e.clientX;
         targetY = e.clientY;
 
-        if (!isMonitorUp) {
+        if (joystickUp) {
+            // Desplazar el joystick de arriba hacia abajo según el mouse
+            const pan = (e.clientY / window.innerHeight - 0.5) * 60;
+            jsUnit.style.setProperty('--js-pan', pan.toFixed(1) + 'px');
+        } else if (!isMonitorUp) {
             checkInteractionZones(targetX);
         }
     });
 
     document.addEventListener('click', () => {
-        if (!gameActive || isTransitioning || isMonitorUp) return;
+        if (!gameActive || isTransitioning || isMonitorUp || joystickUp) return;
 
         if (monsterState === 'ATTACK_VENTANA' && currentScene === 'LEFT' && !canClick) {
             closeWindow();
@@ -553,6 +670,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refreshCurrentCamera();
     updateHotspots();
+    updateChargeUI();
+    updateJoystickBar();
+    chargeInterval = setInterval(chargeTick, CHARGE_TICK_MS);
     scheduleNextPatrolStep();
     animate();
 });

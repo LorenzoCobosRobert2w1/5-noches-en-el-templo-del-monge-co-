@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Russo+One:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,6 +16,19 @@
     </div>
 
     <div class="edge-fade"></div>
+
+    <!-- Joystick de PS5: panel oscuro bajo la linterna (js-backdrop z3), sombra y unidad
+         iluminadas por la linterna (z4, debajo de ruido z5 y linterna z10), y la UI de
+         carga por encima de la linterna (z65) para que siempre se lea. -->
+    <div id="js-backdrop" class="js-backdrop"></div>
+    <div id="js-shadow" class="js-shadow"></div>
+    <div id="js-unit" class="js-unit">
+        <i id="js-ps-button" class="bi bi-playstation js-ps-button"></i>
+    </div>
+    <div id="js-charge" class="js-charge">
+        <div id="js-charge-fill" class="js-charge-fill"></div>
+    </div>
+    <div id="js-hint" class="js-hint">MANTENÉ APRETADO PARA CARGAR</div>
 
     <div class="noise"></div>
     <div id="flashlight" class="flashlight"></div>
@@ -28,6 +42,12 @@
     </div>
 
     <div id="monitor-bar" class="monitor-bar"></div>
+
+    <!-- Barra lateral para levantar el joystick, a la izquierda de la barra de cámara -->
+    <div id="joystick-bar" class="joystick-bar">
+        <div id="joystick-bar-fill" class="joystick-bar-fill"></div>
+        <span class="joystick-bar-label">JOYSTICK</span>
+    </div>
 
     <div id="camera-system" class="camera-system">
         <div id="cam-bg" class="cam-bg"></div>
@@ -44,8 +64,6 @@
                 <button class="cam-btn" data-cam="exterior">CAM 5 - Ext.</button>
             </div>
         </div>
-
-        <div id="ps5-hotspot" class="hotspot hidden" title="Prender la PS5"></div>
 
         <div id="cam-static-flash" class="cam-static-flash"></div>
     </div>
