@@ -70,14 +70,37 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentCamKey = 'living';
 
     // --- IA DEL MONGE ---
-    // Grafo de patrulla: cada nodo lista sus posibles próximos pasos.
-    // Los nodos ATTACK_* no son cámaras, son las amenazas directas en la oficina.
+    // Grafo de patrulla: cada sala es un nodo real por el que el monge deambula.
+    // Salas totalmente interconectadas para que el recorrido varíe y no sea un embudo.
+    // comedor y living son "hubs" seguros; las salas peligrosas cuelgan de ellos.
+    // Los pesos van por repetición de entradas: desde el living tiende a la cocina (puerta).
     const PATROL_GRAPH = {
-        comedor: ['living', 'cocina'],
-        living: ['exterior', 'cocina', 'banio', 'comedor'],
-        cocina: ['ATTACK_PUERTA'],
-        banio: ['ATTACK_ARMARIO'],
-        exterior: ['ATTACK_VENTANA'],
+        comedor:  ['living', 'living', 'cocina', 'banio', 'banio', 'exterior'],
+        living:   ['cocina', 'cocina', 'banio', 'banio', 'exterior', 'comedor'],
+        cocina:   ['comedor', 'living'],
+        banio:    ['comedor', 'living'],
+        exterior: ['comedor', 'living'],
+    };
+
+    // Salas peligrosas: al estar en ellas el monge PUEDE lanzar su ataque (no es automático).
+    // La puerta puede atacarse desde la cocina Y desde el living (no solo cocina).
+    const ROOM_ATTACK = {
+        living:   'ATTACK_PUERTA',
+        cocina:   'ATTACK_PUERTA',
+        banio:    'ATTACK_ARMARIO',
+        exterior: 'ATTACK_VENTANA',
+    };
+
+    // Probabilidad de atacar según la sala (no todas igual):
+    // - exterior: casi seguro ataca la ventana antes de volver
+    // - cocina: es su lugar preferido para lanzar el ataque de puerta
+    // - living: también puede atacar la puerta, pero mucho menos que desde la cocina
+    // - baño: amenaza más ocasional
+    const ROOM_ATTACK_CHANCE = {
+        exterior: 0.85,
+        cocina:   0.55,
+        banio:    0.70,
+        living:   0.15,
     };
 
     const PATROL_MIN_MS = 10000;
@@ -85,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ATTACK_TIMEOUT_MS = 8000;
 
     let monsterNode = 'comedor';
+    let prevNode = null;       // sala de la que vino: evita volver de inmediato (menos ping-pong)
+    let lastAttack = null;     // último ataque ejecutado: no repetirlo dos veces seguidas
     let monsterState = 'patrol'; // patrol | ATTACK_VENTANA | ATTACK_ARMARIO | ATTACK_PUERTA
     let ventanaClosing = false;
     let patrolTimer = null;
@@ -146,14 +171,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function patrolStep() {
         if (!gameActive || monsterState !== 'patrol') return;
-        const options = PATROL_GRAPH[monsterNode];
-        const next = options[Math.floor(Math.random() * options.length)];
 
-        if (next.startsWith('ATTACK_')) {
-            startAttack(next);
+        // 1) Si la sala actual es peligrosa, quizás ataque (nunca el mismo ataque dos veces seguidas).
+        const roomAttack = ROOM_ATTACK[monsterNode];
+        const chance = ROOM_ATTACK_CHANCE[monsterNode] || 0;
+        if (roomAttack && roomAttack !== lastAttack && Math.random() < chance) {
+            startAttack(roomAttack);
             return;
         }
 
+        // 2) Si no ataca, sigue deambulando, evitando volver directo a la sala anterior.
+        let options = PATROL_GRAPH[monsterNode];
+        const filtered = options.filter(n => n !== prevNode);
+        if (filtered.length) options = filtered;
+        const next = options[Math.floor(Math.random() * options.length)];
+
+        prevNode = monsterNode;
         monsterNode = next;
         if (monsterNode !== 'banio') banioSoundPlayed = false;
         refreshCurrentCamera();
@@ -162,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startAttack(type) {
         monsterState = type;
+        lastAttack = type; // recordar para no repetir el mismo ataque en la próxima
         horrorHitPlayed = false;
         refreshOfficeScene();
         refreshCurrentCamera();
@@ -175,7 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function resolveAttack() {
         clearTimeout(attackTimer);
         playScareCurtain(() => {
-            monsterNode = 'comedor';
+            monsterNode = 'living';
+            prevNode = null;
             monsterState = 'patrol';
             banioSoundPlayed = false;
             horrorHitPlayed = false;
